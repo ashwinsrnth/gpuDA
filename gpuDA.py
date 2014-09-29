@@ -15,7 +15,6 @@ class GpuDA:
         self.size = comm.Get_size()
         assert(isinstance(comm, MPI.Cartcomm))
         assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
-
         self._create_halo_arrays()
     
     def halo_swap(self, array):
@@ -25,8 +24,14 @@ class GpuDA:
         sw = self.stencil_width
 
         # copy from arrays to send halos:
-        self._copy_array_to_halo(array, self.left_send_halo, [sw, ny, nz], [0, 0, 0])
-        self._copy_array_to_halo(array, self.right_send_halo, [sw, ny, nz], [nx-1, 0, 0])
+        self._copy_array_to_halo(array, self.left_send_halo, [nz, ny, sw], [0, 0, 0])
+        self._copy_array_to_halo(array, self.right_send_halo, [nz, ny, sw], [0, 0, nx-1])
+
+        self._copy_array_to_halo(array, self.bottom_send_halo, [nz, sw, nx], [0, 0, 0])
+        self._copy_array_to_halo(array, self.top_send_halo, [nz, sw, nx], [0, ny-1, 0])
+
+        self._copy_array_to_halo(array, self.front_send_halo, [sw, ny, nx], [0, 0, 0])
+        self._copy_array_to_halo(array, self.back_send_halo, [sw, ny, nx], [nz-1, 0, 0])
 
         # perform swaps in x-direction
         sendbuf = [self.right_send_halo.gpudata.as_buffer(self.right_send_halo.nbytes), MPI.DOUBLE]
@@ -38,13 +43,13 @@ class GpuDA:
         self._backward_swap(sendbuf, recvbuf, self.rank+1, self.rank-1, xloc, npx)
 
         # perform swaps in y-direction:
-        #sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.front]
-        #recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.back]
-        #self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
+        # sendbuf = [self.i
+        # recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.back]
+        # self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
         
-        #sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.back]
-        #recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.front]
-        #self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
+        # sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.back]
+        # recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.front]
+        # self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
 
         # perform swaps in z-direction
         #sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.top]
@@ -76,6 +81,7 @@ class GpuDA:
             self.comm.Send(sendbuf, dest=dest, tag=10)
 
     def _create_halo_arrays(self):
+
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
         # create two halo regions for each face, one holding
@@ -87,6 +93,16 @@ class GpuDA:
         self.right_recv_halo = self.left_recv_halo.copy()
         self.right_send_halo = self.left_recv_halo.copy()
     
+        self.bottom_recv_halo = gpuarray.empty([nz,sw,nx], dtype=np.float64)
+        self.bottom_send_halo = self.bottom_recv_halo.copy()
+        self.top_recv_halo = self.bottom_recv_halo.copy()
+        self.top_send_halo = self.bottom_recv_halo.copy()
+
+        self.back_recv_halo = gpuarray.empty([sw,ny,nx], dtype=np.float64)
+        self.back_send_halo = self.back_recv_halo.copy()
+        self.front_recv_halo = self.back_recv_halo.copy()
+        self.front_send_halo = self.back_recv_halo.copy()
+
     def _copy_array_to_halo(self, array, halo, copy_dims, copy_offsets, dtype=np.float64):
         # copy from 3-d array to 2-d halo
         #
@@ -95,8 +111,9 @@ class GpuDA:
         # copy_dims: number of elements to copy in (x, y, z) directions
         # copy_offsets: offsets at the source in (x, y, z) directions
         
-        w, h, d = copy_dims
-        x_offs, y_offs, z_offs = copy_offsets
+        nz, ny, nx = self.local_dims 
+        d, h, w  = copy_dims
+        z_offs, y_offs, x_offs = copy_offsets
         
         # TODO: a general type size
         #type_size = dtype.itemsize
@@ -107,10 +124,11 @@ class GpuDA:
 
         copier.src_x_in_bytes = x_offs*8
         copier.src_y = y_offs
+        copier.src_z = z_offs
 
         copier.src_pitch = array.strides[1]
         copier.dst_pitch = halo.strides[1]
-        copier.src_height = h
+        copier.src_height = ny
         copier.dst_height = h
 
         copier.width_in_bytes = w*8
@@ -118,8 +136,11 @@ class GpuDA:
         copier.depth = d
 
         # perform the copy:
-        copier()
-        
+        try:
+            copier()
+        except:
+            print 
+
 if __name__ == "__main__":
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -132,8 +153,8 @@ if __name__ == "__main__":
     assert(npx*npy*npz == size)
 
     nx = 3
-    ny = 512
-    nz = 512
+    ny = 3
+    nz = 3
 
     a = np.arange(nx*ny*nz, dtype=np.float64).reshape([nz, ny, nx])
     a_gpu = gpuarray.to_gpu(a)
