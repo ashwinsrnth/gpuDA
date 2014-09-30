@@ -6,7 +6,7 @@ size = comm.Get_size()
 proc_sizes = [3, 3, 3]
 local_dims = [3, 3, 3]
 
-da = setup_test(proc_sizes, local_dims)
+da, a_gpu, b_gpu = setup_test(proc_sizes, local_dims)
 
 # test that the center received the right
 # values from all 6 neighbours:

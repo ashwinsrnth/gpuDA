@@ -16,20 +16,8 @@ class GpuDA:
         assert(isinstance(comm, MPI.Cartcomm))
         assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
         self._create_halo_arrays()
-
-    
-    def globalToLocal(self, global_array, local_array):
-        
-        # Copies the values from global array
-        # to local array. The local array now holds
-        # updated ghost values.
-
-        # assert shape of local_array
-        # copy from global array to local array
-        # copy from recv halos to local_array
-        pass
-    
-    def halo_swap(self, array):
+   
+    def halo_swap(self, array, local_array):
         
         # Perform the halo swap on the
         # gpuarray `array`, with the
@@ -40,6 +28,11 @@ class GpuDA:
         nz, ny, nx = self.local_dims
         zloc, yloc, xloc = self.comm.Get_topo()[2]
         sw = self.stencil_width
+
+        assert(local_array.shape == [nz+2*sw, ny+2*sw, nx+2*sw])
+        
+        # copy inner elements:
+        self._copy_global_to_local(array, local_array)
 
         # copy from arrays to send halos:
         self._copy_array_to_halo(array, self.left_send_halo, [nz, ny, sw], [0, 0, 0])
@@ -78,6 +71,16 @@ class GpuDA:
         recvbuf = [self.back_recv_halo.gpudata.as_buffer(self.back_recv_halo.nbytes), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz)
         
+        # copy from recv halos to local_array:
+        self._copy_halo_to_array(self.left_recv_halo, local_array, [nz, ny, sw], [sw, sw, 0])
+        self._copy_halo_to_array(self.right_recv_halo, local_array, [nz, ny, sw], [sw, sw, 2*sw+nx-1])
+
+        self._copy_halo_to_array(self.bottom_recv_halo, local_array, [nz, sw, nx], [sw, 0, sw])
+        self._copy_halo_to_array(self.top_recv_halo, local_array, [nz, sw, nx], [sw, 2*sw+ny-1, sw])
+
+        self._copy_halo_to_array(self.front_recv_halo, local_array, [sw, ny, nx], [0, sw, sw])
+        self._copy_halo_to_array(self.back_recv_halo, local_array, [sw, ny, nx], [2*sw+nz-1, sw, sw])
+
     def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
         
         # Perform swap in the +x, +y or +z direction
@@ -115,17 +118,17 @@ class GpuDA:
         # the halo values to send, and the other holding
         # the halo values to receive.
 
-        self.left_recv_halo = gpuarray.empty([nz,ny,sw], dtype=np.float64)
+        self.left_recv_halo = gpuarray.zeros([nz,ny,sw], dtype=np.float64)
         self.left_send_halo = self.left_recv_halo.copy()
         self.right_recv_halo = self.left_recv_halo.copy()
         self.right_send_halo = self.left_recv_halo.copy()
     
-        self.bottom_recv_halo = gpuarray.empty([nz,sw,nx], dtype=np.float64)
+        self.bottom_recv_halo = gpuarray.zeros([nz,sw,nx], dtype=np.float64)
         self.bottom_send_halo = self.bottom_recv_halo.copy()
         self.top_recv_halo = self.bottom_recv_halo.copy()
         self.top_send_halo = self.bottom_recv_halo.copy()
 
-        self.back_recv_halo = gpuarray.empty([sw,ny,nx], dtype=np.float64)
+        self.back_recv_halo = gpuarray.zeros([sw,ny,nx], dtype=np.float64)
         self.back_send_halo = self.back_recv_halo.copy()
         self.front_recv_halo = self.back_recv_halo.copy()
         self.front_send_halo = self.back_recv_halo.copy()
@@ -144,14 +147,13 @@ class GpuDA:
         z_offs, y_offs, x_offs = copy_offsets
         
         # TODO: a general type size
-        #type_size = dtype.itemsize
+        typesize = array.dtype.itemsize
 
-        copi
-        er = cuda.Memcpy3D()
+        copier = cuda.Memcpy3D()
         copier.set_src_device(array.gpudata)
         copier.set_dst_device(halo.gpudata)
 
-        copier.src_x_in_bytes = x_offs*8
+        copier.src_x_in_bytes = x_offs*typesize
         copier.src_y = y_offs
         copier.src_z = z_offs
 
@@ -160,14 +162,14 @@ class GpuDA:
         copier.src_height = ny
         copier.dst_height = h
 
-        copier.width_in_bytes = w*8
+        copier.width_in_bytes = w*typesize
         copier.height = h
         copier.depth = d
 
         # perform the copy:
         copier()
 
-    def _copy_halo_to_array(self, halo, array, copy_dims, copy_offets, dtype=np.float64):
+    def _copy_halo_to_array(self, halo, array, copy_dims, copy_offsets, dtype=np.float64):
         
         # copy from 2-d halo to 3-d array
         #
@@ -177,14 +179,59 @@ class GpuDA:
         # copy_offsets: offsets at the destination in (z, y, x) directions
         
         nz, ny, nx = self.local_dims
+        sw = self.stencil_width
         d, h, w = copy_dims
         z_offs, y_offs, x_offs = copy_offsets
 
-        #type_size = dtype.itemsize
+        typesize = array.dtype.itemsize
 
         copier = cuda.Memcpy3D()
         copier.set_src_device(halo.gpudata)
         copier.set_dst_device(array.gpudata)
 
-        #copier.src_x_in_bytes = 
-        pass
+        # this time, offsets are at the destination:
+        copier.dst_x_in_bytes = x_offs*typesize
+        copier.dst_y = y_offs
+        copier.dst_z = z_offs
+
+        copier.src_pitch = halo.strides[1]
+        copier.dst_pitch = array.strides[1]
+        copier.src_height = h
+        copier.dst_height = ny+2*sw
+
+        copier.width_in_bytes = w*typesize
+        copier.height = h
+        copier.depth = d
+        
+        # perform the copy:
+        copier()
+
+    def _copy_global_to_local(self, a_array, b_array, dtype=np.float64):
+
+        # copy between two 3-d arrays
+        # a_array -> b_array
+        
+        nz, ny, nx = self.local_dims
+        sw = self.stencil_width
+      
+        typesize = a_array.dtype.itemsize
+
+        copier = cuda.Memcpy3D()
+        copier.set_src_device(a_array.gpudata)
+        copier.set_dst_device(b_array.gpudata)
+
+        # offsets 
+        copier.dst_x_in_bytes = sw*typesize
+        copier.dst_y = sw
+        copier.dst_z = sw
+
+        copier.src_pitch = a_array.strides[1] 
+        copier.dst_pitch = b_array.strides[1]
+        copier.src_height = ny
+        copier.dst_height = ny+2*sw
+
+        copier.width_in_bytes = nx*typesize
+        copier.height = ny
+        copier.depth = nz
+
+        copier()
