@@ -16,6 +16,18 @@ class GpuDA:
         assert(isinstance(comm, MPI.Cartcomm))
         assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
         self._create_halo_arrays()
+
+    
+    def globalToLocal(self, global_array, local_array):
+        
+        # Copies the values from global array
+        # to local array. The local array now holds
+        # updated ghost values.
+
+        # assert shape of local_array
+        # copy from global array to local array
+        # copy from recv halos to local_array
+        pass
     
     def halo_swap(self, array):
         
@@ -124,8 +136,8 @@ class GpuDA:
         #
         # Paramters:
         # array, halo:  gpuarrays involved in the copy.
-        # copy_dims: number of elements to copy in (x, y, z) directions
-        # copy_offsets: offsets at the source in (x, y, z) directions
+        # copy_dims: number of elements to copy in (z, y, x) directions
+        # copy_offsets: offsets at the source in (z, y, x) directions
         
         nz, ny, nx = self.local_dims 
         d, h, w  = copy_dims
@@ -134,7 +146,8 @@ class GpuDA:
         # TODO: a general type size
         #type_size = dtype.itemsize
 
-        copier = cuda.Memcpy3D()
+        copi
+        er = cuda.Memcpy3D()
         copier.set_src_device(array.gpudata)
         copier.set_dst_device(halo.gpudata)
 
@@ -154,3 +167,24 @@ class GpuDA:
         # perform the copy:
         copier()
 
+    def _copy_halo_to_array(self, halo, array, copy_dims, copy_offets, dtype=np.float64):
+        
+        # copy from 2-d halo to 3-d array
+        #
+        # Parameters:
+        # halo, array:  gpuarrays involved in the copy
+        # copy_dims: number of elements to copy in (z, y, x) directions
+        # copy_offsets: offsets at the destination in (z, y, x) directions
+        
+        nz, ny, nx = self.local_dims
+        d, h, w = copy_dims
+        z_offs, y_offs, x_offs = copy_offsets
+
+        #type_size = dtype.itemsize
+
+        copier = cuda.Memcpy3D()
+        copier.set_src_device(halo.gpudata)
+        copier.set_dst_device(array.gpudata)
+
+        #copier.src_x_in_bytes = 
+        pass
