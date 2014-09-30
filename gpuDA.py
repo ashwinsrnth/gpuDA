@@ -132,13 +132,13 @@ class GpuDA:
         z_offs, y_offs, x_offs = copy_offsets
         
         # TODO: a general type size
-        #type_size = dtype.itemsize
-
+        type_size = array.dtype.itemsize
+ 
         copier = cuda.Memcpy3D()
         copier.set_src_device(array.gpudata)
         copier.set_dst_device(halo.gpudata)
 
-        copier.src_x_in_bytes = x_offs*8
+        copier.src_x_in_bytes = x_offs*type_size
         copier.src_y = y_offs
         copier.src_z = z_offs
 
@@ -147,7 +147,7 @@ class GpuDA:
         copier.src_height = ny
         copier.dst_height = h
 
-        copier.width_in_bytes = w*8
+        copier.width_in_bytes = w*type_size
         copier.height = h
         copier.depth = d
 
