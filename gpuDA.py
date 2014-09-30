@@ -18,6 +18,12 @@ class GpuDA:
         self._create_halo_arrays()
     
     def halo_swap(self, array):
+        
+        # Perform the halo swap on the
+        # gpuarray `array`, with the
+        # recv_halos holding the updated
+        # halo values after the swap.
+
         npz, npy, npx = self.proc_sizes
         nz, ny, nx = self.local_dims
         zloc, yloc, xloc = self.comm.Get_topo()[2]
@@ -43,24 +49,27 @@ class GpuDA:
         self._backward_swap(sendbuf, recvbuf, self.rank+1, self.rank-1, xloc, npx)
 
         # perform swaps in y-direction:
-        # sendbuf = [self.i
-        # recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.back]
-        # self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
-        
-        # sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.back]
-        # recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.front]
-        # self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
+        sendbuf = [self.top_send_halo.gpudata.as_buffer(self.top_send_halo.nbytes), MPI.DOUBLE]
+        recvbuf = [self.bottom_recv_halo.gpudata.as_buffer(self.bottom_recv_halo.nbytes), MPI.DOUBLE]
+        self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
+       
+        sendbuf = [self.bottom_send_halo.gpudata.as_buffer(self.bottom_send_halo.nbytes), MPI.DOUBLE]
+        recvbuf = [self.top_recv_halo.gpudata.as_buffer(self.top_recv_halo.nbytes), MPI.DOUBLE]
+        self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
 
-        # perform swaps in z-direction
-        #sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.top]
-        #recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.bottom]
-        #self._forward_swap(sendbuf, recvbuf, self.rank-npx*npy, self.rank+npx*npy, zloc, npz)
-        
-        #sendbuf = [a_gpu.gpudata.as_buffer(a_gpu.nbytes), 1, self.bottom]
-        #recvbuf = [b_gpu.gpudata.as_buffer(b_gpu.nbytes), 1, self.top]
-        #self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz)
+        # perform swaps in z-direction:
+        sendbuf = [self.back_send_halo.gpudata.as_buffer(self.back_send_halo.nbytes), MPI.DOUBLE]
+        recvbuf = [self.front_recv_halo.gpudata.as_buffer(self.front_recv_halo.nbytes), MPI.DOUBLE]
+        self._forward_swap(sendbuf, recvbuf, self.rank-npx*npy, self.rank+npx*npy, zloc, npz)
+       
+        sendbuf = [self.front_send_halo.gpudata.as_buffer(self.front_send_halo.nbytes), MPI.DOUBLE]
+        recvbuf = [self.back_recv_halo.gpudata.as_buffer(self.back_recv_halo.nbytes), MPI.DOUBLE]
+        self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz)
         
     def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
+        
+        # Perform swap in the +x, +y or +z direction
+        
         if loc > 0 and loc < dimprocs-1:
             self.comm.Sendrecv(sendbuf=sendbuf, dest=dest, sendtag=10, recvbuf=recvbuf, recvtag=10, source=src)
           
@@ -71,6 +80,9 @@ class GpuDA:
             self.comm.Recv(recvbuf, source=src, tag=10)
 
     def _backward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
+        
+        # Perform swap in the -x, -y or -z direction
+        
         if loc > 0 and loc < dimprocs-1:
             self.comm.Sendrecv(sendbuf=sendbuf, dest=dest, sendtag=10, recvbuf=recvbuf, recvtag=10, source=src)
 
@@ -81,6 +93,9 @@ class GpuDA:
             self.comm.Send(sendbuf, dest=dest, tag=10)
 
     def _create_halo_arrays(self):
+
+        # Allocate space for the halos: two per face,
+        # one for sending and one for receiving.
 
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
@@ -104,6 +119,7 @@ class GpuDA:
         self.front_send_halo = self.back_recv_halo.copy()
 
     def _copy_array_to_halo(self, array, halo, copy_dims, copy_offsets, dtype=np.float64):
+
         # copy from 3-d array to 2-d halo
         #
         # Paramters:
@@ -136,31 +152,34 @@ class GpuDA:
         copier.depth = d
 
         # perform the copy:
-        try:
-            copier()
-        except:
-            print 
+        copier()
 
 if __name__ == "__main__":
+    
+    t1 = MPI.Wtime()
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
     
     npx = 3
-    npy = 1
-    npz = 1
+    npy = 3
+    npz = 3
         
     assert(npx*npy*npz == size)
 
-    nx = 3
-    ny = 3
-    nz = 3
+    nx = 512
+    ny = 512
+    nz = 512
 
     a = np.arange(nx*ny*nz, dtype=np.float64).reshape([nz, ny, nx])
     a_gpu = gpuarray.to_gpu(a)
     
-    comm = comm.Create_cart([npz, npy, npx], reorder=True)
+    comm = comm.Create_cart([npz, npy, npx], reorder=False)
     da = GpuDA(comm, [nz, ny, nx], [npz, npy, npx], 1)
     da.halo_swap(a_gpu)
-    MPI.Finalize()
+    t2 = MPI.Wtime()
 
+    if rank == 0:
+        print "Time taken: ", t2-t1
+
+    MPI.Finalize()
