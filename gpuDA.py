@@ -1,6 +1,5 @@
 from mpi4py import MPI
 import numpy as np
-from pycuda import autoinit
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
 
@@ -29,8 +28,8 @@ class GpuDA:
         zloc, yloc, xloc = self.comm.Get_topo()[2]
         sw = self.stencil_width
 
-        assert(local_array.shape == [nz+2*sw, ny+2*sw, nx+2*sw])
-        
+        assert(tuple(local_array.shape) == (nz+2*sw, ny+2*sw, nx+2*sw))
+ 
         # copy inner elements:
         self._copy_global_to_local(array, local_array)
 
