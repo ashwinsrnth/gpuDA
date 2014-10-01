@@ -1,4 +1,5 @@
 from gpuDAtest import *
+from pycuda import autoinit
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
