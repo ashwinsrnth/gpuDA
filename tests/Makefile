@@ -1,4 +1,4 @@
-MPIFLAGS=--mca btl_openib_warn_nonexistent_if 0 --mca btl_openib_want_cuda_gdr 1 --mca pml ob1
+MPIFLAGS=--mca btl_openib_warn_nonexistent_if 0 --mca btl_openib_want_cuda_gdr 0 --mca pml ob1
 
 test:
 	make test_1d
