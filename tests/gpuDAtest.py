@@ -22,6 +22,6 @@ def setup_test(proc_sizes, local_dims):
    
     comm = comm.Create_cart([npz, npy, npx], reorder=True)
     da = GpuDA(comm, [nz, ny, nx], [npz, npy, npx], 1)
-    da.halo_swap(a_gpu, b_gpu)
+    da.global_to_local(a_gpu, b_gpu)
 
     return da, a_gpu, b_gpu
