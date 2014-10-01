@@ -16,12 +16,10 @@ class GpuDA:
         assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
         self._create_halo_arrays()
    
-    def halo_swap(self, array, local_array):
-        
-        # Perform the halo swap on the
-        # gpuarray `array`, with the
-        # recv_halos holding the updated
-        # halo values after the swap.
+    def global_to_local(self, global_array, local_array):
+
+        # Update the local array (which includes ghost points)
+        # from the global array (which does not)
 
         npz, npy, npx = self.proc_sizes
         nz, ny, nx = self.local_dims
@@ -31,17 +29,17 @@ class GpuDA:
         assert(tuple(local_array.shape) == (nz+2*sw, ny+2*sw, nx+2*sw))
  
         # copy inner elements:
-        self._copy_global_to_local(array, local_array)
+        self._copy_global_to_local(global_array, local_array)
 
         # copy from arrays to send halos:
-        self._copy_array_to_halo(array, self.left_send_halo, [nz, ny, sw], [0, 0, 0])
-        self._copy_array_to_halo(array, self.right_send_halo, [nz, ny, sw], [0, 0, nx-1])
+        self._copy_array_to_halo(global_array, self.left_send_halo, [nz, ny, sw], [0, 0, 0])
+        self._copy_array_to_halo(global_array, self.right_send_halo, [nz, ny, sw], [0, 0, nx-1])
 
-        self._copy_array_to_halo(array, self.bottom_send_halo, [nz, sw, nx], [0, 0, 0])
-        self._copy_array_to_halo(array, self.top_send_halo, [nz, sw, nx], [0, ny-1, 0])
+        self._copy_array_to_halo(global_array, self.bottom_send_halo, [nz, sw, nx], [0, 0, 0])
+        self._copy_array_to_halo(global_array, self.top_send_halo, [nz, sw, nx], [0, ny-1, 0])
 
-        self._copy_array_to_halo(array, self.front_send_halo, [sw, ny, nx], [0, 0, 0])
-        self._copy_array_to_halo(array, self.back_send_halo, [sw, ny, nx], [nz-1, 0, 0])
+        self._copy_array_to_halo(global_array, self.front_send_halo, [sw, ny, nx], [0, 0, 0])
+        self._copy_array_to_halo(global_array, self.back_send_halo, [sw, ny, nx], [nz-1, 0, 0])
 
         # perform swaps in x-direction
         sendbuf = [self.right_send_halo.gpudata.as_buffer(self.right_send_halo.nbytes), MPI.DOUBLE]
