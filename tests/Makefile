@@ -3,7 +3,7 @@ MPIFLAGS=--mca btl_openib_warn_nonexistent_if 0 --mca btl_openib_want_cuda_gdr 1
 test:
 	make test_1d
 	make test_3d
-
+	rm -f *.pyc
 
 test_1d:
 	@echo "testing 1d case with 3 procs: "
