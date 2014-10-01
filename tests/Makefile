@@ -1,5 +1,10 @@
 MPIFLAGS=--mca btl_openib_warn_nonexistent_if 0 --mca btl_openib_want_cuda_gdr 1 --mca pml ob1
 
+test:
+	make test_1d
+	make test_3d
+
+
 test_1d:
 	@echo "testing 1d case with 3 procs: "
 	mpiexec -n 3 ${MPIFLAGS} python test_1d.py
