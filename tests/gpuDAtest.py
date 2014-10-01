@@ -1,4 +1,3 @@
-import nose
 import sys
 sys.path.append('..')
 from gpuDA import *

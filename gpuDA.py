@@ -86,7 +86,7 @@ class GpuDA:
         # from a local array (which contains ghost values).
         # This does *not* involve any communication.
 
-        self._copy_local_to_global(self, local_array, global_array)
+        self._copy_local_to_global(local_array, global_array)
 
 
     def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
@@ -264,6 +264,6 @@ class GpuDA:
 
         copier.width_in_bytes = nx*typesize
         copier.height = ny
-        copier.depth = z
+        copier.depth = nz
 
         copier()
