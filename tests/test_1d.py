@@ -23,7 +23,4 @@ if rank == 0:
 if rank == 2:
     assert(np.all(da.left_recv_halo.get() == 1))
 
-if rank == 1:
-    print b_gpu
-
 MPI.Finalize()
