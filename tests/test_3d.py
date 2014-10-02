@@ -25,6 +25,9 @@ if rank == 13:
     assert(np.all(da.front_recv_halo.get() == 4))
     assert(np.all(da.back_recv_halo.get() == 22))
 
+if rank == 22:
+    assert(np.all(b_gpu.get()[-1,:,:] == 22))
+
 b = np.zeros([nz+2,ny+2,nx+2], dtype=np.float64)
 b.fill(rank)
 b_gpu = gpuarray.to_gpu(b)
@@ -34,5 +37,8 @@ da.local_to_global(b_gpu, a_gpu)
 
 if rank == 13:
     assert(np.all(a_gpu.get() == 13))
+
+if rank == 22:
+    assert(np.all(b_gpu.get()[-1,:,:] == 22))
 
 MPI.Finalize()
