@@ -37,7 +37,7 @@ comm = comm.Create_cart([npz, npy, npx], reorder=False)
 da = GpuDA(comm, [nz, ny, nx], [npz, npy, npx], 1)
 
 t1 = MPI.Wtime()
-da.halo_swap(a_gpu, b_gpu)
+da.global_to_local(a_gpu, b_gpu)
 t2 = MPI.Wtime()
 
 if rank == 0:

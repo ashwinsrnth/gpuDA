@@ -1,8 +1,8 @@
 #!/bin/bash
 
-export MPIFLAGS="--mca btl_openib_warn_nonexistent_if 0 --mca btl_openib_want_cuda_gdr 1 --mca pml ob1"
+export MPIFLAGS="--mca btl_openib_warn_nonexistent_if 0 --mca btl_openib_want_cuda_gdr 0 --mca pml ob1"
 
-rm *timings.txt
+rm -f *timings.txt
 
 for halo_size in 8 16 32 64 128 256 512 1024 2048
 do
@@ -17,4 +17,5 @@ do
 done
 
 python plot_performance.py
-rm *.pyc ../*.pyc
+
+rm -f *.pyc ../*.pyc
