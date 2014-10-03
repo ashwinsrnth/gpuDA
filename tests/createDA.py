@@ -3,7 +3,10 @@ sys.path.append('..')
 from gpuDA import *
 
 
-def create_test_da(proc_sizes, local_dims):
+def create_da(proc_sizes, local_dims):
+
+    # Convenience function: creates a DA for running
+    # the tests
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()

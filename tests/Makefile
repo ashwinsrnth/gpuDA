@@ -11,5 +11,7 @@ test_1d:
 
 test_3d:
 	@echo "testing 3d case with 27 procs: "
-	mpiexec -n 27 ${MPIFLAGS} python test_3d.py
+	mpiexec -n 27 ${MPIFLAGS} nosetests test_3d.py
 
+clean:
+	rm -f *.pyc
