@@ -1,4 +1,4 @@
-from gpuDAtest import *
+from createDA import *
 from pycuda import autoinit
 
 comm = MPI.COMM_WORLD
@@ -8,7 +8,7 @@ proc_sizes = [1, 1, 3]
 local_dims = [1, 3, 3]
 nz, ny, nx = local_dims
 
-da = create_test_da(proc_sizes, local_dims)
+da = create_da(proc_sizes, local_dims)
 
 a = np.empty(local_dims, dtype=np.float64)
 a.fill(rank)
