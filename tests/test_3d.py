@@ -1,52 +1,68 @@
-from gpuDAtest import *
+from createDA import *
 from pycuda import autoinit
+import nose
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-proc_sizes = [3, 3, 3]
-local_dims = [4, 4, 4]
-nz, ny, nx = local_dims
 
-da = create_test_da(proc_sizes, local_dims)
+class TestGpuDA3d:
 
-# fill a with rank
-a = np.zeros([nz,ny,nx], dtype=np.float64)
-a.fill(rank)
-a_gpu = gpuarray.to_gpu(a)
+    @classmethod
+    def setup_class(cls): 
+        cls.comm = MPI.COMM_WORLD
+        cls.rank = cls.comm.Get_rank()
+        cls.size = cls.comm.Get_size()
+        assert(cls.size == 27)
+        cls.proc_sizes = [3, 3, 3]
+        cls.local_dims = [4, 4, 4]
+        
+        cls.da = create_da(cls.proc_sizes, cls.local_dims)
+ 
+    def test_gtol(self):
 
-# fill b with ones
-b = np.ones([nz+2,ny+2,nx+2], dtype=np.float64)
-b_gpu = gpuarray.to_gpu(b)
+        nz, ny, nx = self.local_dims
+        
+        # fill a with rank
+        a = np.zeros([nz,ny,nx], dtype=np.float64)
+        a.fill(self.rank)
+        a_gpu = gpuarray.to_gpu(a)
 
-da.global_to_local(a_gpu, b_gpu)
+        # fill b with ones
+        b = np.ones([nz+2,ny+2,nx+2], dtype=np.float64)
+        b_gpu = gpuarray.to_gpu(b)
 
-# test that proper communication happened
-if rank == 13:
-    assert(np.all(da.left_recv_halo.get() == 12))
-    assert(np.all(da.right_recv_halo.get() == 14))
-    assert(np.all(da.bottom_recv_halo.get() == 10))
-    assert(np.all(da.top_recv_halo.get() == 16))
-    assert(np.all(da.front_recv_halo.get() == 4))
-    assert(np.all(da.back_recv_halo.get() == 22))
+        self.da.global_to_local(a_gpu, b_gpu)
 
-# test that boundaries aren't affected by halo swap
-if rank == 22:
-    assert(np.all(b_gpu.get()[-1,:,:] == 1))
+        # test gtol at the center
+        if self.rank == 13:
+            assert(np.all(b_gpu.get()[:,:,0] == 12))
+            assert(np.all(b_gpu.get()[:,:,-1] == 14))
+            assert(np.all(b_gpu.get()[:,0,:] == 10))
+            assert(np.all(b_gpu.get()[:,-1,:] == 16))
+            assert(np.all(b_gpu.get()[0,:,:] == 4))
+            assert(np.all(b_gpu.get()[-1,:,:] == 22))
+        
+        # test that the boundaries remain unaffected:
+        if self.rank == 22:
+            # since we initially filled b with ones
+            assert(np.all(b_gpu.get()[-1,:,:] == 1))
 
-# fill b with a sequence starting with `rank`:
-b = np.ones([nz+2,ny+2,nx+2], dtype=np.float64)
-b = b*np.arange((nx+2)*(ny+2)*(nz+2)).reshape([nz+2, ny+2, nx+2])
-b_gpu = gpuarray.to_gpu(b)
+    def test_ltog(self):
 
-# a is empty
-a_gpu = gpuarray.empty([nz,ny,nx], dtype=np.float64)
-da.local_to_global(b_gpu, a_gpu)
+        nz, ny, nx = self.local_dims
 
-# test the ltog routines:
-if rank == 0:
-    print b_gpu.get()
-    print a_gpu.get()
-    assert(np.all(a_gpu.get() == b_gpu.get()[1:-1,1:-1,1:-1]))
+        # fill b with a sequence
+        b = np.ones([nz+2, ny+2, nx+2], dtype=np.float64)
+        b = b*np.arange((nx+2)*(ny+2)*(nz+2)).reshape([nz+2, ny+2, nx+2])
+        b_gpu = gpuarray.to_gpu(b)
 
-MPI.Finalize()
+        # a is empty
+        a_gpu = gpuarray.empty([nz,ny,nx], dtype=np.float64)
+
+        self.da.local_to_global(b_gpu, a_gpu)
+
+        # test ltog:
+        if self.rank == 0:
+            assert(np.all(a_gpu.get() == b_gpu.get()[1:-1,1:-1,1:-1]))
+
+    @classmethod
+    def teardown_class(cls):
+        MPI.Finalize()
