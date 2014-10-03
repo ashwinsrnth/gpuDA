@@ -33,12 +33,12 @@ class TestGpuDA3d:
 
         # test gtol at the center
         if self.rank == 13:
-            assert(np.all(b_gpu.get()[:,:,0] == 12))
-            assert(np.all(b_gpu.get()[:,:,-1] == 14))
-            assert(np.all(b_gpu.get()[:,0,:] == 10))
-            assert(np.all(b_gpu.get()[:,-1,:] == 16))
-            assert(np.all(b_gpu.get()[0,:,:] == 4))
-            assert(np.all(b_gpu.get()[-1,:,:] == 22))
+            assert(np.all(b_gpu.get()[1:-1,1:-1,0] == 12))
+            assert(np.all(b_gpu.get()[1:-1,1:-1,-1] == 14))
+            assert(np.all(b_gpu.get()[1:-1,0,1:-1] == 10))
+            assert(np.all(b_gpu.get()[1:-1,-1,1:-1] == 16))
+            assert(np.all(b_gpu.get()[0,1:-1,1:-1] == 4))
+            assert(np.all(b_gpu.get()[-1,1:-1,1:-1] == 22))
         
         # test that the boundaries remain unaffected:
         if self.rank == 22:
