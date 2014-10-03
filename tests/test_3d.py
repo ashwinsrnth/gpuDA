@@ -5,7 +5,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 proc_sizes = [3, 3, 3]
-local_dims = [3, 3, 3]
+local_dims = [4, 4, 4]
 nz, ny, nx = local_dims
 
 da = create_test_da(proc_sizes, local_dims)
@@ -34,21 +34,19 @@ if rank == 13:
 if rank == 22:
     assert(np.all(b_gpu.get()[-1,:,:] == 1))
 
-# fill b with rank
-b = np.zeros([nz+2,ny+2,nx+2], dtype=np.float64)
-b.fill(rank)
+# fill b with a sequence starting with `rank`:
+b = np.ones([nz+2,ny+2,nx+2], dtype=np.float64)
+b = b*np.arange((nx+2)*(ny+2)*(nz+2)).reshape([nz+2, ny+2, nx+2])
 b_gpu = gpuarray.to_gpu(b)
 
 # a is empty
 a_gpu = gpuarray.empty([nz,ny,nx], dtype=np.float64)
-
 da.local_to_global(b_gpu, a_gpu)
 
 # test the ltog routines:
-if rank == 13:
-    assert(np.all(a_gpu.get() == 13))
-
-if rank == 22:
-    assert(np.all(b_gpu.get()[-1,:,:] == 22))
+if rank == 0:
+    print b_gpu.get()
+    print a_gpu.get()
+    assert(np.all(a_gpu.get() == b_gpu.get()[1:-1,1:-1,1:-1]))
 
 MPI.Finalize()
