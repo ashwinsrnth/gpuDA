@@ -10,10 +10,10 @@ nz, ny, nx = local_dims
 
 da = create_da(proc_sizes, local_dims)
 
-a = np.empty(local_dims, dtype=np.float64)
-a.fill(rank)
-a_gpu = gpuarray.to_gpu(a)
-b_gpu = gpuarray.empty([nz+2, ny+2, nx+2], dtype=np.float64)
+a_gpu = da.create_global()
+a_gpu.fill(rank)
+
+b_gpu = da.create_local()
 
 da.global_to_local(a_gpu, b_gpu)
 

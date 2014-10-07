@@ -18,10 +18,14 @@ class GpuDA:
         self._create_halo_arrays()
 
     def create_global(self):
+        nz, ny, nx = self.local_dims
+        sw = self.stencil_width
         return gpuarray.empty([nz, ny, nx], dtype=np.float64)
 
     def create_local(self):
-        return gpuarray.empty([nz+sw, ny+sw, nx+sw], dtype=np.float64)
+        nz, ny, nx = self.local_dims
+        sw = self.stencil_width
+        return gpuarray.empty([nz+2*sw, ny+2*sw, nx+2*sw], dtype=np.float64)
 
     def global_to_local(self, global_array, local_array):
 
