@@ -16,7 +16,13 @@ class GpuDA:
         assert(isinstance(comm, MPI.Cartcomm))
         assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
         self._create_halo_arrays()
-   
+
+    def create_global(self):
+        return gpuarray.empty([nz, ny, nx], dtype=np.float64)
+
+    def create_local(self):
+        return gpuarray.empty([nz+sw, ny+sw, nx+sw], dtype=np.float64)
+
     def global_to_local(self, global_array, local_array):
 
         # Update the local array (which includes ghost points)
