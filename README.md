@@ -1,6 +1,8 @@
+=======
+gpuDA
+=======
 
-
-
+A PETSc inspired approach to halo swaps and other stuff for MPI+PyCUDA gpuarrays.
 
 Running the tests
 =================
@@ -12,3 +14,4 @@ do:
     make test
 
 inside the `test` directory.
+
