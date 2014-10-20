@@ -127,6 +127,15 @@ class GpuDA:
 
         return (zstart, zend), (ystart, yend), (xstart, xend)
 
+    def getSizes(self):
+
+        # Returns the size of the distributed array
+        # EXCLUDING the ghost points
+
+        npz, npy, npx = self.proc_sizes
+        nz, ny, nx = self.local_dims
+        return npz*nz, npy*ny, npx*nx
+
     def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
         
         # Perform swap in the +x, +y or +z direction

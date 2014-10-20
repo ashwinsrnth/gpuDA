@@ -1,7 +1,6 @@
 from createDA import *
 from pycuda import autoinit
-import nose
-
+from nose.tools import *
 
 class TestGpuDA3d:
 
@@ -62,7 +61,7 @@ class TestGpuDA3d:
         if self.rank == 0:
             assert(np.all(a_gpu.get() == b_gpu.get()[1:-1,1:-1,1:-1]))
 
-    def test_getRanges(self):
+    def test_get_ranges(self):
 
         nz, ny, nx = self.local_dims
         (zstart, zend), (ystart, yend), (xstart, xend) = self.da.getRanges()
@@ -74,6 +73,9 @@ class TestGpuDA3d:
             assert(zend == 2*nz)
             assert(yend == 2*ny)
             assert(xend == 2*nx)
+
+    def test_get_sizes(self):
+        assert_equal(self.da.getSizes(), (12, 12, 12))
 
     @classmethod
     def teardown_class(cls):
