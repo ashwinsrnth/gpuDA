@@ -7,7 +7,7 @@ test:
 
 test_1d:
 	@echo "testing 1d case with 3 procs: "
-	mpiexec -n 3 ${MPIFLAGS} python test_1d.py
+	mpiexec -n 3 ${MPIFLAGS} nosetests test_1d.py
 
 test_3d:
 	@echo "testing 3d case with 27 procs: "
