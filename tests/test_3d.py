@@ -20,14 +20,13 @@ class TestGpuDA3d:
 
         nz, ny, nx = self.local_dims
         
-        # fill a with rank
-        a = np.zeros([nz,ny,nx], dtype=np.float64)
-        a.fill(self.rank)
-        a_gpu = gpuarray.to_gpu(a)
+        # fill a_gpu with rank
+        a_gpu = self.da.createGlobalVec()
+        a_gpu.fill(self.rank)
 
-        # fill b with ones
-        b = np.ones([nz+2,ny+2,nx+2], dtype=np.float64)
-        b_gpu = gpuarray.to_gpu(b)
+        # fill b_gpu with ones
+        b_gpu = self.da.createLocalVec()
+        b_gpu.fill(1.0)
 
         self.da.globalToLocal(a_gpu, b_gpu)
 
