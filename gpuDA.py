@@ -17,17 +17,17 @@ class GpuDA:
         assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
         self._create_halo_arrays()
 
-    def create_global(self):
+    def createGlobalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
         return gpuarray.empty([nz, ny, nx], dtype=np.float64)
 
-    def create_local(self):
+    def createLocalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
         return gpuarray.empty([nz+2*sw, ny+2*sw, nx+2*sw], dtype=np.float64)
 
-    def global_to_local(self, global_array, local_array):
+    def globalToLocal(self, global_array, local_array):
 
         # Update the local array (which includes ghost points)
         # from the global array (which does not)
@@ -99,7 +99,7 @@ class GpuDA:
             self._copy_halo_to_array(self.back_recv_halo, local_array, [sw, ny, nx], [2*sw+nz-1, sw, sw])
 
 
-    def local_to_global(self, local_array, global_array):
+    def localToGlobal(self, local_array, global_array):
 
         # Update a global array (no ghost values)
         # from a local array (which contains ghost values).
@@ -317,10 +317,3 @@ class GpuDA:
 
         else:
             return False
-       
-        
-
-
-
-
-
