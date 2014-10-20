@@ -107,6 +107,25 @@ class GpuDA:
 
         self._copy_local_to_global(local_array, global_array)
 
+    def getRanges(self):
+
+        # Returns a tuple (zstart, zend), (ystart, yend), (xstart, xend)
+        # representing the corner coordinates, EXCLUDING the ghost
+        # points
+
+        npz, npy, npx = self.proc_sizes
+        nz, ny, nx = self.local_dims
+        zloc, yloc, xloc = self.comm.Get_topo()[2]
+        sw = self.stencil_width
+
+        zstart = zloc*nz
+        zend = zstart+nz
+        ystart = yloc*ny
+        yend = ystart+ny
+        xstart = xloc*nx
+        xend = xstart+nx
+
+        return (zstart, zend), (ystart, yend), (xstart, xend)
 
     def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
         

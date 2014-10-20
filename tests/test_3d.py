@@ -62,6 +62,19 @@ class TestGpuDA3d:
         if self.rank == 0:
             assert(np.all(a_gpu.get() == b_gpu.get()[1:-1,1:-1,1:-1]))
 
+    def test_getRanges(self):
+
+        nz, ny, nx = self.local_dims
+        (zstart, zend), (ystart, yend), (xstart, xend) = self.da.getRanges()
+
+        if self.rank == 13:
+            assert(zstart == nz)
+            assert(ystart == ny)
+            assert(xstart == nx)
+            assert(zend == 2*nz)
+            assert(yend == 2*ny)
+            assert(xend == 2*nx)
+
     @classmethod
     def teardown_class(cls):
         MPI.Finalize()
