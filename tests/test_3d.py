@@ -29,7 +29,7 @@ class TestGpuDA3d:
         b = np.ones([nz+2,ny+2,nx+2], dtype=np.float64)
         b_gpu = gpuarray.to_gpu(b)
 
-        self.da.global_to_local(a_gpu, b_gpu)
+        self.da.globalToLocal(a_gpu, b_gpu)
 
         # test gtol at the center
         if self.rank == 13:
@@ -57,7 +57,7 @@ class TestGpuDA3d:
         # a is empty
         a_gpu = gpuarray.empty([nz,ny,nx], dtype=np.float64)
 
-        self.da.local_to_global(b_gpu, a_gpu)
+        self.da.localToGlobal(b_gpu, a_gpu)
 
         # test ltog:
         if self.rank == 0:
