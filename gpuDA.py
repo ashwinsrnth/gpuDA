@@ -53,30 +53,30 @@ class GpuDA:
         self._copy_array_to_halo(global_array, self.back_send_halo, [sw, ny, nx], [nz-1, 0, 0])
 
         # perform swaps in x-direction
-        sendbuf = [self.right_send_halo.gpudata.as_buffer(self.right_send_halo.nbytes), MPI.DOUBLE]
-        recvbuf = [self.left_recv_halo.gpudata.as_buffer(self.left_recv_halo.nbytes), MPI.DOUBLE]
+        sendbuf = [self.buffer_from_gpuarray(self.right_send_halo), MPI.DOUBLE]
+        recvbuf = [self.buffer_from_gpuarray(self.left_recv_halo), MPI.DOUBLE]
         self._forward_swap(sendbuf, recvbuf, self.rank-1, self.rank+1, xloc, npx)
 
-        sendbuf = [self.left_send_halo.gpudata.as_buffer(self.left_send_halo.nbytes), MPI.DOUBLE]
-        recvbuf = [self.right_recv_halo.gpudata.as_buffer(self.right_recv_halo.nbytes), MPI.DOUBLE]
+        sendbuf = [self.buffer_from_gpuarray(self.left_send_halo), MPI.DOUBLE]
+        recvbuf = [self.buffer_from_gpuarray(self.right_recv_halo), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+1, self.rank-1, xloc, npx)
 
         # perform swaps in y-direction:
-        sendbuf = [self.top_send_halo.gpudata.as_buffer(self.top_send_halo.nbytes), MPI.DOUBLE]
-        recvbuf = [self.bottom_recv_halo.gpudata.as_buffer(self.bottom_recv_halo.nbytes), MPI.DOUBLE]
+        sendbuf = [self.buffer_from_gpuarray(self.top_send_halo), MPI.DOUBLE]
+        recvbuf = [self.buffer_from_gpuarray(self.bottom_recv_halo), MPI.DOUBLE]
         self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
        
-        sendbuf = [self.bottom_send_halo.gpudata.as_buffer(self.bottom_send_halo.nbytes), MPI.DOUBLE]
-        recvbuf = [self.top_recv_halo.gpudata.as_buffer(self.top_recv_halo.nbytes), MPI.DOUBLE]
+        sendbuf = [self.buffer_from_gpuarray(self.bottom_send_halo), MPI.DOUBLE]
+        recvbuf = [self.buffer_from_gpuarray(self.top_recv_halo), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
 
         # perform swaps in z-direction:
-        sendbuf = [self.back_send_halo.gpudata.as_buffer(self.back_send_halo.nbytes), MPI.DOUBLE]
-        recvbuf = [self.front_recv_halo.gpudata.as_buffer(self.front_recv_halo.nbytes), MPI.DOUBLE]
+        sendbuf = [self.buffer_from_gpuarray(self.back_send_halo), MPI.DOUBLE]
+        recvbuf = [self.buffer_from_gpuarray(self.front_recv_halo), MPI.DOUBLE]
         self._forward_swap(sendbuf, recvbuf, self.rank-npx*npy, self.rank+npx*npy, zloc, npz)
        
-        sendbuf = [self.front_send_halo.gpudata.as_buffer(self.front_send_halo.nbytes), MPI.DOUBLE]
-        recvbuf = [self.back_recv_halo.gpudata.as_buffer(self.back_recv_halo.nbytes), MPI.DOUBLE]
+        sendbuf = [self.buffer_from_gpuarray(self.front_send_halo), MPI.DOUBLE]
+        recvbuf = [self.buffer_from_gpuarray(self.back_recv_halo), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz)
         
         # copy from recv halos to local_array:
@@ -345,3 +345,14 @@ class GpuDA:
 
         else:
             return False
+
+    def buffer_from_gpuarray(self, array):
+        
+        data = array.gpudata
+        # data might be an `int` or `DeviceAllocation`
+
+        if isinstance(data, cuda.DeviceAllocation):
+            return data.as_buffer(array.nbytes)
+        else:
+            # construct the buffer
+            return MPI.make_buffer(array.gpudata, array.nbytes)
