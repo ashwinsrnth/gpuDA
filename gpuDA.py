@@ -5,8 +5,7 @@ import pycuda.gpuarray as gpuarray
 
 class GpuDA:
 
-    def __init__(self, comm, local_dims, proc_sizes, stencil_width):
-        
+    def __init__(self, comm, local_dims, proc_sizes, stencil_width):        
         self.comm = comm
         self.local_dims = local_dims
         self.proc_sizes = proc_sizes
@@ -53,30 +52,30 @@ class GpuDA:
         self._copy_array_to_halo(global_array, self.back_send_halo, [sw, ny, nx], [nz-1, 0, 0])
 
         # perform swaps in x-direction
-        sendbuf = [self.buffer_from_gpuarray(self.right_send_halo), MPI.DOUBLE]
-        recvbuf = [self.buffer_from_gpuarray(self.left_recv_halo), MPI.DOUBLE]
+        sendbuf = [self._buffer_from_gpuarray(self.right_send_halo), MPI.DOUBLE]
+        recvbuf = [self._buffer_from_gpuarray(self.left_recv_halo), MPI.DOUBLE]
         self._forward_swap(sendbuf, recvbuf, self.rank-1, self.rank+1, xloc, npx)
 
-        sendbuf = [self.buffer_from_gpuarray(self.left_send_halo), MPI.DOUBLE]
-        recvbuf = [self.buffer_from_gpuarray(self.right_recv_halo), MPI.DOUBLE]
+        sendbuf = [self._buffer_from_gpuarray(self.left_send_halo), MPI.DOUBLE]
+        recvbuf = [self._buffer_from_gpuarray(self.right_recv_halo), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+1, self.rank-1, xloc, npx)
 
         # perform swaps in y-direction:
-        sendbuf = [self.buffer_from_gpuarray(self.top_send_halo), MPI.DOUBLE]
-        recvbuf = [self.buffer_from_gpuarray(self.bottom_recv_halo), MPI.DOUBLE]
+        sendbuf = [self._buffer_from_gpuarray(self.top_send_halo), MPI.DOUBLE]
+        recvbuf = [self._buffer_from_gpuarray(self.bottom_recv_halo), MPI.DOUBLE]
         self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
        
-        sendbuf = [self.buffer_from_gpuarray(self.bottom_send_halo), MPI.DOUBLE]
-        recvbuf = [self.buffer_from_gpuarray(self.top_recv_halo), MPI.DOUBLE]
+        sendbuf = [self._buffer_from_gpuarray(self.bottom_send_halo), MPI.DOUBLE]
+        recvbuf = [self._buffer_from_gpuarray(self.top_recv_halo), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
 
         # perform swaps in z-direction:
-        sendbuf = [self.buffer_from_gpuarray(self.back_send_halo), MPI.DOUBLE]
-        recvbuf = [self.buffer_from_gpuarray(self.front_recv_halo), MPI.DOUBLE]
+        sendbuf = [self._buffer_from_gpuarray(self.back_send_halo), MPI.DOUBLE]
+        recvbuf = [self._buffer_from_gpuarray(self.front_recv_halo), MPI.DOUBLE]
         self._forward_swap(sendbuf, recvbuf, self.rank-npx*npy, self.rank+npx*npy, zloc, npz)
        
-        sendbuf = [self.buffer_from_gpuarray(self.front_send_halo), MPI.DOUBLE]
-        recvbuf = [self.buffer_from_gpuarray(self.back_recv_halo), MPI.DOUBLE]
+        sendbuf = [self._buffer_from_gpuarray(self.front_send_halo), MPI.DOUBLE]
+        recvbuf = [self._buffer_from_gpuarray(self.back_recv_halo), MPI.DOUBLE]
         self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz)
         
         # copy from recv halos to local_array:
@@ -346,8 +345,7 @@ class GpuDA:
         else:
             return False
 
-    def buffer_from_gpuarray(self, array):
-        
+    def _buffer_from_gpuarray(self, array):
         data = array.gpudata
         # data might be an `int` or `DeviceAllocation`
 
