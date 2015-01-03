@@ -5,15 +5,15 @@ import pycuda.gpuarray as gpuarray
 
 class GpuDA:
 
-    def __init__(self, comm, local_dims, proc_sizes, stencil_width):        
+    def __init__(self, comm, local_dims, stencil_width):        
+        assert(isinstance(comm, MPI.Cartcomm))
         self.comm = comm
         self.local_dims = local_dims
-        self.proc_sizes = proc_sizes
         self.stencil_width = stencil_width
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
-        assert(isinstance(comm, MPI.Cartcomm))
-        assert(self.size == reduce(lambda a,b: a*b, proc_sizes))
+        self.proc_sizes = comm.Get_topo()[0]
+        assert(self.size == reduce(lambda a,b: a*b, self.proc_sizes))       
         self._create_halo_arrays()
 
     def createGlobalVec(self):

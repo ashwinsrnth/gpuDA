@@ -17,6 +17,6 @@ def create_da(proc_sizes, local_dims):
     assert(npx*npy*npz == size)
   
     comm = comm.Create_cart([npz, npy, npx], reorder=True)
-    da = GpuDA(comm, [nz, ny, nx], [npz, npy, npx], 1)
+    da = GpuDA(comm, [nz, ny, nx], 1)
      
     return da
