@@ -3,6 +3,9 @@ import numpy as np
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
 
+from theano import sandbox
+import pygpu
+
 class GpuDA:
 
     def __init__(self, comm, local_dims, stencil_width):        
@@ -19,12 +22,12 @@ class GpuDA:
     def createGlobalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
-        return gpuarray.empty([nz, ny, nx], dtype=np.float64)
+        return pygpu.empty([nz, ny, nx], dtype='float64')
 
     def createLocalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
-        return gpuarray.empty([nz+2*sw, ny+2*sw, nx+2*sw], dtype=np.float64)
+        return pygpu.empty([nz+2*sw, ny+2*sw, nx+2*sw], dtype='float64')
 
     def globalToLocal(self, global_array, local_array):
 
@@ -172,22 +175,22 @@ class GpuDA:
         # the halo values to send, and the other holding
         # the halo values to receive.
 
-        self.left_recv_halo = gpuarray.empty([nz,ny,sw], dtype=np.float64)
+        self.left_recv_halo = pygpu.empty([nz,ny,sw], dtype='float64')
         self.left_send_halo = self.left_recv_halo.copy()
         self.right_recv_halo = self.left_recv_halo.copy()
         self.right_send_halo = self.left_recv_halo.copy()
     
-        self.bottom_recv_halo = gpuarray.empty([nz,sw,nx], dtype=np.float64)
+        self.bottom_recv_halo = pygpu.empty([nz,sw,nx], dtype='float64')
         self.bottom_send_halo = self.bottom_recv_halo.copy()
         self.top_recv_halo = self.bottom_recv_halo.copy()
         self.top_send_halo = self.bottom_recv_halo.copy()
 
-        self.back_recv_halo = gpuarray.empty([sw,ny,nx], dtype=np.float64)
+        self.back_recv_halo = pygpu.empty([sw,ny,nx], dtype='float64')
         self.back_send_halo = self.back_recv_halo.copy()
         self.front_recv_halo = self.back_recv_halo.copy()
         self.front_send_halo = self.back_recv_halo.copy()
 
-    def _copy_array_to_halo(self, array, halo, copy_dims, copy_offsets, dtype=np.float64):
+    def _copy_array_to_halo(self, array, halo, copy_dims, copy_offsets, dtype='float64'):
 
         # copy from 3-d array to 2-d halo
         #
@@ -223,7 +226,7 @@ class GpuDA:
         # perform the copy:
         copier()
 
-    def _copy_halo_to_array(self, halo, array, copy_dims, copy_offsets, dtype=np.float64):
+    def _copy_halo_to_array(self, halo, array, copy_dims, copy_offsets, dtype='float64'):
         
         # copy from 2-d halo to 3-d array
         #
@@ -260,7 +263,7 @@ class GpuDA:
         # perform the copy:
         copier()
 
-    def _copy_global_to_local(self, global_array, local_array, dtype=np.float64):
+    def _copy_global_to_local(self, global_array, local_array, dtype='float64'):
 
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
@@ -268,8 +271,8 @@ class GpuDA:
         typesize = global_array.dtype.itemsize
 
         copier = cuda.Memcpy3D()
-        copier.set_src_device(global_array.gpudata)
-        copier.set_dst_device(local_array.gpudata)
+        copier.set_src_device(self._raw_pointer_from(global_array))
+        copier.set_dst_device(self._raw_pointer_from(local_array.gpudata))
 
         # offsets 
         copier.dst_x_in_bytes = sw*typesize
@@ -287,7 +290,7 @@ class GpuDA:
 
         copier()
 
-    def _copy_local_to_global(self, local_array, global_array, dtype=np.float64):
+    def _copy_local_to_global(self, local_array, global_array, dtype='float64'):
 
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
@@ -295,8 +298,8 @@ class GpuDA:
         typesize = global_array.dtype.itemsize
 
         copier = cuda.Memcpy3D()
-        copier.set_src_device(local_array.gpudata)
-        copier.set_dst_device(global_array.gpudata)
+        copier.set_src_device(self._raw_pointer_from(local_array))
+        copier.set_dst_device(self._raw_pointer_from(global_array))
 
         # offsets
         copier.src_x_in_bytes = sw*typesize
@@ -321,7 +324,7 @@ class GpuDA:
         # neighbour on a specified side
         # side can be 'left', 'right', 'top' or 'bottom'
         
-        npz, npy, npx = self.comm.Get_topo()[0]
+        npz, npy, npx = self.proc_sizes
         mz, my, mx = self.comm.Get_topo()[2]
         
         if side == 'left' and mx > 0:
@@ -345,10 +348,12 @@ class GpuDA:
         else:
             return False
 
+    def _raw_pointer_from(self, array):
+        return pygpu.gpuarray.get_raw_ptr(array.gpudata)
+
     def _buffer_from_gpuarray(self, array):
         data = array.gpudata
         # data might be an `int` or `DeviceAllocation`
-
         if isinstance(data, cuda.DeviceAllocation):
             return data.as_buffer(array.nbytes)
         else:
