@@ -1,13 +1,12 @@
 from mpi4py import MPI
 import numpy as np
+from numpy.testing import *
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
-
-from theano import sandbox
+from ndarray import TheanoNDArray
 import pygpu
 
 class GpuDA:
-
     def __init__(self, comm, local_dims, stencil_width):        
         assert(isinstance(comm, MPI.Cartcomm))
         self.comm = comm
@@ -22,12 +21,12 @@ class GpuDA:
     def createGlobalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
-        return pygpu.empty([nz, ny, nx], dtype='float64')
+        return TheanoNDArray([nz, ny, nx])
 
     def createLocalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
-        return pygpu.empty([nz+2*sw, ny+2*sw, nx+2*sw], dtype='float64')
+        return TheanoNDArray([nz+2*sw, ny+2*sw, nx+2*sw])
 
     def globalToLocal(self, global_array, local_array):
 
@@ -39,7 +38,7 @@ class GpuDA:
         zloc, yloc, xloc = self.comm.Get_topo()[2]
         sw = self.stencil_width
 
-        assert(tuple(local_array.shape) == (nz+2*sw, ny+2*sw, nx+2*sw))
+        assert_equal(tuple(local_array.shape), (nz+2*sw, ny+2*sw, nx+2*sw))
  
         # copy inner elements:
         self._copy_global_to_local(global_array, local_array)
@@ -175,20 +174,20 @@ class GpuDA:
         # the halo values to send, and the other holding
         # the halo values to receive.
 
-        self.left_recv_halo = pygpu.empty([nz,ny,sw], dtype='float64')
-        self.left_send_halo = self.left_recv_halo.copy()
-        self.right_recv_halo = self.left_recv_halo.copy()
-        self.right_send_halo = self.left_recv_halo.copy()
-    
-        self.bottom_recv_halo = pygpu.empty([nz,sw,nx], dtype='float64')
-        self.bottom_send_halo = self.bottom_recv_halo.copy()
-        self.top_recv_halo = self.bottom_recv_halo.copy()
-        self.top_send_halo = self.bottom_recv_halo.copy()
+        self.left_recv_halo = TheanoNDArray([nz, ny, sw])        
+        self.left_send_halo = TheanoNDArray([nz, ny, sw])
+        self.right_recv_halo = TheanoNDArray([nz, ny, sw])
+        self.right_send_halo = TheanoNDArray([nz, ny, sw])
 
-        self.back_recv_halo = pygpu.empty([sw,ny,nx], dtype='float64')
-        self.back_send_halo = self.back_recv_halo.copy()
-        self.front_recv_halo = self.back_recv_halo.copy()
-        self.front_send_halo = self.back_recv_halo.copy()
+        self.bottom_recv_halo = TheanoNDArray([nz, sw, nx])
+        self.bottom_send_halo = TheanoNDArray([nz, sw, nx])
+        self.top_recv_halo = TheanoNDArray([nz, sw, nx])
+        self.top_send_halo = TheanoNDArray([nz, sw, nx])
+
+        self.back_recv_halo = TheanoNDArray([sw, ny, nx])
+        self.back_send_halo =  TheanoNDArray([sw, ny, nx])
+        self.front_recv_halo =  TheanoNDArray([sw, ny, nx])
+        self.front_send_halo =  TheanoNDArray([sw, ny, nx])
 
     def _copy_array_to_halo(self, array, halo, copy_dims, copy_offsets, dtype='float64'):
 
@@ -203,7 +202,7 @@ class GpuDA:
         d, h, w  = copy_dims
         z_offs, y_offs, x_offs = copy_offsets
         
-        typesize = array.dtype.itemsize
+        typesize = array.itemsize
 
         copier = cuda.Memcpy3D()
         copier.set_src_device(array.gpudata)
@@ -240,7 +239,7 @@ class GpuDA:
         d, h, w = copy_dims
         z_offs, y_offs, x_offs = copy_offsets
 
-        typesize = array.dtype.itemsize
+        typesize = array.itemsize
 
         copier = cuda.Memcpy3D()
         copier.set_src_device(halo.gpudata)
@@ -264,15 +263,15 @@ class GpuDA:
         copier()
 
     def _copy_global_to_local(self, global_array, local_array, dtype='float64'):
-
+        
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
       
-        typesize = global_array.dtype.itemsize
+        typesize = global_array.itemsize
 
         copier = cuda.Memcpy3D()
-        copier.set_src_device(self._raw_pointer_from(global_array))
-        copier.set_dst_device(self._raw_pointer_from(local_array.gpudata))
+        copier.set_src_device(global_array.gpudata)
+        copier.set_dst_device(local_array.gpudata)
 
         # offsets 
         copier.dst_x_in_bytes = sw*typesize
@@ -289,17 +288,18 @@ class GpuDA:
         copier.depth = nz
 
         copier()
-
+        
+        
     def _copy_local_to_global(self, local_array, global_array, dtype='float64'):
 
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
 
-        typesize = global_array.dtype.itemsize
+        typesize = global_array.itemsize
 
         copier = cuda.Memcpy3D()
-        copier.set_src_device(self._raw_pointer_from(local_array))
-        copier.set_dst_device(self._raw_pointer_from(global_array))
+        copier.set_src_device(local_array.gpudata)
+        copier.set_dst_device(global_array.gpudata)
 
         # offsets
         copier.src_x_in_bytes = sw*typesize
@@ -348,14 +348,5 @@ class GpuDA:
         else:
             return False
 
-    def _raw_pointer_from(self, array):
-        return pygpu.gpuarray.get_raw_ptr(array.gpudata)
-
     def _buffer_from_gpuarray(self, array):
-        data = array.gpudata
-        # data might be an `int` or `DeviceAllocation`
-        if isinstance(data, cuda.DeviceAllocation):
-            return data.as_buffer(array.nbytes)
-        else:
-            # construct the buffer
-            return MPI.make_buffer(array.gpudata, array.nbytes)
+        return MPI.make_buffer(array.gpudata, array.nbytes)
