@@ -7,11 +7,12 @@ from ndarray import TheanoNDArray
 import pygpu
 
 class GpuDA:
-    def __init__(self, comm, local_dims, stencil_width):        
+    def __init__(self, comm, local_dims, stencil_width, dof=1):
         assert(isinstance(comm, MPI.Cartcomm))
         self.comm = comm
         self.local_dims = local_dims
         self.stencil_width = stencil_width
+        self.dof = dof
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
         self.proc_sizes = comm.Get_topo()[0]
@@ -21,12 +22,18 @@ class GpuDA:
     def createGlobalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
-        return TheanoNDArray([nz, ny, nx])
+        if self.dof>1:
+            return TheanoNDArray([nz, ny, nx, self.dof])
+        else:
+            return TheanoNDArray([nz, ny, nx])
 
     def createLocalVec(self):
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
-        return TheanoNDArray([nz+2*sw, ny+2*sw, nx+2*sw])
+        if self.dof>1:
+            return TheanoNDArray([nz+2*sw, ny+2*sw, nx+2*sw, self.dof])
+        else:
+            return TheanoNDArray([nz+2*sw, ny+2*sw, nx+2*sw])
 
     def globalToLocal(self, global_array, local_array):
 
@@ -99,7 +106,6 @@ class GpuDA:
         if self.has_neighbour('back'):
             self._copy_halo_to_array(self.back_recv_halo, local_array, [sw, ny, nx], [2*sw+nz-1, sw, sw])
 
-
     def localToGlobal(self, local_array, global_array):
 
         # Update a global array (no ghost values)
@@ -170,24 +176,25 @@ class GpuDA:
 
         nz, ny, nx = self.local_dims
         sw = self.stencil_width
+        dof = self.dof
         # create two halo regions for each face, one holding
         # the halo values to send, and the other holding
         # the halo values to receive.
 
-        self.left_recv_halo = TheanoNDArray([nz, ny, sw])        
-        self.left_send_halo = TheanoNDArray([nz, ny, sw])
-        self.right_recv_halo = TheanoNDArray([nz, ny, sw])
-        self.right_send_halo = TheanoNDArray([nz, ny, sw])
+        self.left_recv_halo = TheanoNDArray([nz, ny, sw, dof]) 
+        self.left_send_halo = TheanoNDArray([nz, ny, sw, dof])
+        self.right_recv_halo = TheanoNDArray([nz, ny, sw, dof])
+        self.right_send_halo = TheanoNDArray([nz, ny, sw, dof])
 
-        self.bottom_recv_halo = TheanoNDArray([nz, sw, nx])
-        self.bottom_send_halo = TheanoNDArray([nz, sw, nx])
-        self.top_recv_halo = TheanoNDArray([nz, sw, nx])
-        self.top_send_halo = TheanoNDArray([nz, sw, nx])
+        self.bottom_recv_halo = TheanoNDArray([nz, sw, nx, dof])
+        self.bottom_send_halo = TheanoNDArray([nz, sw, nx, dof])
+        self.top_recv_halo = TheanoNDArray([nz, sw, nx, dof])
+        self.top_send_halo = TheanoNDArray([nz, sw, nx, dof])
 
-        self.back_recv_halo = TheanoNDArray([sw, ny, nx])
-        self.back_send_halo =  TheanoNDArray([sw, ny, nx])
-        self.front_recv_halo =  TheanoNDArray([sw, ny, nx])
-        self.front_send_halo =  TheanoNDArray([sw, ny, nx])
+        self.back_recv_halo = TheanoNDArray([sw, ny, nx, dof])
+        self.back_send_halo =  TheanoNDArray([sw, ny, nx, dof])
+        self.front_recv_halo =  TheanoNDArray([sw, ny, nx, dof])
+        self.front_send_halo =  TheanoNDArray([sw, ny, nx, dof])
 
     def _copy_array_to_halo(self, array, halo, copy_dims, copy_offsets, dtype='float64'):
 
@@ -198,7 +205,8 @@ class GpuDA:
         # copy_dims: number of elements to copy in (z, y, x) directions
         # copy_offsets: offsets at the source in (z, y, x) directions
         
-        nz, ny, nx = self.local_dims 
+        nz, ny, nx = self.local_dims
+
         d, h, w  = copy_dims
         z_offs, y_offs, x_offs = copy_offsets
         
@@ -216,7 +224,6 @@ class GpuDA:
         copier.dst_pitch = halo.strides[1]
         copier.src_height = ny
         copier.dst_height = h
-
 
         copier.width_in_bytes = w*typesize
         copier.height = h
@@ -288,8 +295,7 @@ class GpuDA:
         copier.depth = nz
 
         copier()
-        
-        
+                
     def _copy_local_to_global(self, local_array, global_array, dtype='float64'):
 
         nz, ny, nx = self.local_dims
@@ -316,7 +322,6 @@ class GpuDA:
         copier.depth = nz
 
         copier()
-
 
     def has_neighbour(self, side):
         
