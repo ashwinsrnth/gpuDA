@@ -216,7 +216,7 @@ class GpuDA:
         copier.set_src_device(array.gpudata)
         copier.set_dst_device(halo.gpudata)
 
-        copier.src_x_in_bytes = x_offs*typesize
+        copier.src_x_in_bytes = x_offs*self.dof*typesize
         copier.src_y = y_offs
         copier.src_z = z_offs
 
@@ -225,7 +225,7 @@ class GpuDA:
         copier.src_height = ny
         copier.dst_height = h
 
-        copier.width_in_bytes = w*typesize
+        copier.width_in_bytes = w*self.dof*typesize
         copier.height = h
         copier.depth = d
 
@@ -253,7 +253,7 @@ class GpuDA:
         copier.set_dst_device(array.gpudata)
 
         # this time, offsets are at the destination:
-        copier.dst_x_in_bytes = x_offs*typesize
+        copier.dst_x_in_bytes = x_offs*self.dof*typesize
         copier.dst_y = y_offs
         copier.dst_z = z_offs
 
@@ -262,7 +262,7 @@ class GpuDA:
         copier.src_height = h
         copier.dst_height = ny+2*sw
 
-        copier.width_in_bytes = w*typesize
+        copier.width_in_bytes = w*self.dof*typesize
         copier.height = h
         copier.depth = d
         
@@ -281,7 +281,7 @@ class GpuDA:
         copier.set_dst_device(local_array.gpudata)
 
         # offsets 
-        copier.dst_x_in_bytes = sw*typesize
+        copier.dst_x_in_bytes = sw*self.dof*typesize
         copier.dst_y = sw
         copier.dst_z = sw
 
@@ -290,7 +290,7 @@ class GpuDA:
         copier.src_height = ny
         copier.dst_height = ny+2*sw
 
-        copier.width_in_bytes = nx*typesize
+        copier.width_in_bytes = nx*self.dof*typesize
         copier.height = ny
         copier.depth = nz
 
@@ -308,7 +308,7 @@ class GpuDA:
         copier.set_dst_device(global_array.gpudata)
 
         # offsets
-        copier.src_x_in_bytes = sw*typesize
+        copier.src_x_in_bytes = sw*self.dof*typesize
         copier.src_y = sw
         copier.src_z = sw
 
@@ -317,7 +317,7 @@ class GpuDA:
         copier.src_height = ny+2*sw
         copier.dst_height = ny
 
-        copier.width_in_bytes = nx*typesize
+        copier.width_in_bytes = nx*self.dof*typesize
         copier.height = ny
         copier.depth = nz
 
