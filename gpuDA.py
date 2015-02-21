@@ -103,8 +103,9 @@ class GpuDA:
         # Perform swap in the +x, +y or +z direction
         
         if loc > 0 and loc < dimprocs-1:
-            self.comm.Sendrecv(sendbuf=sendbuf, dest=dest, sendtag=10, recvbuf=recvbuf, recvtag=10, source=src)
-          
+            self.comm.Send(sendbuf, dest=dest, tag=10)
+            self.comm.Recv(recvbuf, source=src, tag=10)
+
         elif loc == 0 and dimprocs > 1:
             self.comm.Send(sendbuf, dest=dest, tag=10)
 
@@ -116,8 +117,9 @@ class GpuDA:
         # Perform swap in the -x, -y or -z direction
         
         if loc > 0 and loc < dimprocs-1:
-            self.comm.Sendrecv(sendbuf=sendbuf, dest=dest, sendtag=10, recvbuf=recvbuf, recvtag=10, source=src)
-
+            self.comm.Send(sendbuf, dest=dest, tag=10)
+            self.comm.Recv(recvbuf, source=src, tag=10)
+        
         elif loc == 0 and dimprocs > 1:
             self.comm.Recv(recvbuf, source=src, tag=10)
 
