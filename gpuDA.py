@@ -45,30 +45,33 @@ class GpuDA:
         # perform swaps in x-direction
         sendbuf = [self.right_send_halo.gpudata.as_buffer(self.right_send_halo.nbytes), MPI.DOUBLE]
         recvbuf = [self.left_recv_halo.gpudata.as_buffer(self.left_recv_halo.nbytes), MPI.DOUBLE]
-        self._forward_swap(sendbuf, recvbuf, self.rank-1, self.rank+1, xloc, npx)
+        req1 = self._forward_swap(sendbuf, recvbuf, self.rank-1, self.rank+1, xloc, npx, 10)
 
         sendbuf = [self.left_send_halo.gpudata.as_buffer(self.left_send_halo.nbytes), MPI.DOUBLE]
         recvbuf = [self.right_recv_halo.gpudata.as_buffer(self.right_recv_halo.nbytes), MPI.DOUBLE]
-        self._backward_swap(sendbuf, recvbuf, self.rank+1, self.rank-1, xloc, npx)
+        req2 = self._backward_swap(sendbuf, recvbuf, self.rank+1, self.rank-1, xloc, npx, 20)
 
         # perform swaps in y-direction:
         sendbuf = [self.top_send_halo.gpudata.as_buffer(self.top_send_halo.nbytes), MPI.DOUBLE]
         recvbuf = [self.bottom_recv_halo.gpudata.as_buffer(self.bottom_recv_halo.nbytes), MPI.DOUBLE]
-        self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy)
+        req3 = self._forward_swap(sendbuf, recvbuf, self.rank-npx, self.rank+npx, yloc, npy, 30)
        
         sendbuf = [self.bottom_send_halo.gpudata.as_buffer(self.bottom_send_halo.nbytes), MPI.DOUBLE]
         recvbuf = [self.top_recv_halo.gpudata.as_buffer(self.top_recv_halo.nbytes), MPI.DOUBLE]
-        self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy)
+        req4 = self._backward_swap(sendbuf, recvbuf, self.rank+npx, self.rank-npx, yloc, npy, 40)
 
         # perform swaps in z-direction:
         sendbuf = [self.back_send_halo.gpudata.as_buffer(self.back_send_halo.nbytes), MPI.DOUBLE]
         recvbuf = [self.front_recv_halo.gpudata.as_buffer(self.front_recv_halo.nbytes), MPI.DOUBLE]
-        self._forward_swap(sendbuf, recvbuf, self.rank-npx*npy, self.rank+npx*npy, zloc, npz)
+        req5 = self._forward_swap(sendbuf, recvbuf, self.rank-npx*npy, self.rank+npx*npy, zloc, npz, 50)
        
         sendbuf = [self.front_send_halo.gpudata.as_buffer(self.front_send_halo.nbytes), MPI.DOUBLE]
         recvbuf = [self.back_recv_halo.gpudata.as_buffer(self.back_recv_halo.nbytes), MPI.DOUBLE]
-        self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz)
+        req6 = self._backward_swap(sendbuf, recvbuf, self.rank+npx*npy, self.rank-npx*npy, zloc, npz, 60)
         
+        requests = [req for req in  [req1, req2, req3, req4, req5, req6] if req != None]
+        MPI.Request.Waitall(requests, [MPI.Status()]*len(requests))
+
         # copy from recv halos to local_array:
         if self.has_neighbour('left'):
             self._copy_halo_to_array(self.left_recv_halo, local_array, [nz, ny, sw], [sw, sw, 0])
@@ -98,34 +101,39 @@ class GpuDA:
         self._copy_local_to_global(local_array, global_array)
 
 
-    def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
+    def _forward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs, tag):
         
         # Perform swap in the +x, +y or +z direction
         
         if loc > 0 and loc < dimprocs-1:
-            self.comm.Send(sendbuf, dest=dest, tag=10)
-            self.comm.Recv(recvbuf, source=src, tag=10)
+            self.comm.Isend(sendbuf, dest=dest, tag=tag)
+            req = self.comm.Irecv(recvbuf, source=src, tag=tag)
 
         elif loc == 0 and dimprocs > 1:
-            self.comm.Send(sendbuf, dest=dest, tag=10)
+            self.comm.Isend(sendbuf, dest=dest, tag=tag)
+            req = None
 
         elif loc == dimprocs-1 and dimprocs > 1:
-            self.comm.Recv(recvbuf, source=src, tag=10)
+            req = self.comm.Irecv(recvbuf, source=src, tag=tag)
+            
+        return req
 
-    def _backward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs):
+    def _backward_swap(self, sendbuf, recvbuf, src, dest, loc, dimprocs, tag):
         
         # Perform swap in the -x, -y or -z direction
         
         if loc > 0 and loc < dimprocs-1:
-            self.comm.Send(sendbuf, dest=dest, tag=10)
-            self.comm.Recv(recvbuf, source=src, tag=10)
+            self.comm.Isend(sendbuf, dest=dest, tag=tag)
+            req = self.comm.Irecv(recvbuf, source=src, tag=tag)
         
         elif loc == 0 and dimprocs > 1:
-            self.comm.Recv(recvbuf, source=src, tag=10)
+            req = self.comm.Irecv(recvbuf, source=src, tag=tag)
 
         elif loc == dimprocs-1 and dimprocs > 1:
-            self.comm.Send(sendbuf, dest=dest, tag=10)
+            self.comm.Isend(sendbuf, dest=dest, tag=tag)
+            req = None
 
+        return req
     def _create_halo_arrays(self):
 
         # Allocate space for the halos: two per face,
