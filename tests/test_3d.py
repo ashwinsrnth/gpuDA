@@ -1,6 +1,6 @@
 from createDA import *
 from pycuda import autoinit
-from nose.tools import *
+from numpy.testing import assert_equal
 
 class TestGpuDA3d:
 
@@ -62,7 +62,6 @@ class TestGpuDA3d:
             assert(np.all(a_gpu.get() == b_gpu.get()[1:-1,1:-1,1:-1]))
 
     def test_get_ranges(self):
-
         nz, ny, nx = self.local_dims
         (zstart, zend), (ystart, yend), (xstart, xend) = self.da.getRanges()
 
