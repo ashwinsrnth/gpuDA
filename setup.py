@@ -8,4 +8,6 @@ setup(name='gpuda',
         author_email='atrikut@clemson.edu',
         license='MIT',
         packages=['gpuda'],
+        setup_requires=['mpi4py'],
+        dependency_links=['https://mathema.tician.de/software/pycuda/'],
         zip_safe=False)
