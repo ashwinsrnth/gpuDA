@@ -314,7 +314,6 @@ class GpuDA:
 
         copier()
 
-
     def has_neighbour(self, side):
         
         # Check that the processor has a
