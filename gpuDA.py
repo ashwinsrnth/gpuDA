@@ -13,7 +13,7 @@ class GpuDA:
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
         self.proc_sizes = comm.Get_topo()[0]
-        assert(self.size == reduce(lambda a,b: a*b, self.proc_sizes))       
+        assert(self.size == np.product(self.proc_sizes))
         self._create_halo_arrays()
 
     def createGlobalVec(self):
